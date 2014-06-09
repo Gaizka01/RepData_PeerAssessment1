@@ -1,20 +1,105 @@
-# Reproducible Research: Peer Assessment 1
+Peer Assessment 1
+========================================================
 
+This are my answers to the questions posed in peer assessment 1.  
+Loading of data
 
-## Loading and preprocessing the data
+```{r loading of data}
+temp = tempfile()
+download.file("http://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip", temp)
+data = read.csv(unz(temp, "activity.csv"), colClasses = c("numeric", "Date", "numeric"))
+```
 
+The mean number of steps made each day is:
+```{r calculating mean NA ignored}
+mean = tapply(data$steps,data$date, mean, na.rm = T)
+print(mean)
+```
 
+The median number of steps made each day is:
+```{r calculating median NA ignored}
+median = tapply(data$steps,data$date, median, na.rm = T)
+print(median)
+```
 
-## What is mean total number of steps taken per day?
+This histogram shows the total amount of steps made each day:
+```{r histogram step sum}
+library(ggplot2)
+x = tapply(data$steps, data$date, sum, na.rm = T)
+x = as.data.frame(x)
+g = ggplot(x, aes(rownames(x), x))
+a = g + geom_bar(stat = "identity") + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, size = 5)) +
+        labs (x = "Day") + labs (y = "Number of Steps")
+print (a)
+```
 
+The average daily pattern of steps is reflected in the next figure:
+```{r average daily pattern}
+x= tapply(data$steps, data$interval, mean, na.rm = T)
+x1 =data.frame(as.numeric(rownames(x)), x)
+g = ggplot(x1, aes(x1[,1], x1[,2]))
+a = g + geom_line(stat = "identity") + theme(axis.text.x = element_text(angle = 90)) +
+        labs (x = "Interval") + labs (y = "Number of Steps") + scale_x_discrete(breaks = seq(0, 2355, 50))
+print (a)
+````
 
+ 
 
-## What is the average daily activity pattern?
+```{r maximum interval}
+maximum = x1[x1[, 2] == max(x1[,2]), 1]
+```
 
+With the maximum number of steps achieved at interval `r maximum`:
 
+```{r amount missing values}
+miss = nrow(data) - sum(complete.cases(data))
+```
 
-## Imputing missing values
+Data has `r miss` missing values, and missing values have been replaced by the average step number for each month in a new dataset. The following histogram shows the total number of steps taken each day after replacing the missing values.
 
+```{r histogram after replace}
+newdata = data.frame(data)
+newdata$fecha = as.POSIXlt(data$date)
+newdata[(!complete.cases(newdata[, 1]) & newdata$fecha$mon == 9), 1] = mean(newdata[newdata$fecha$mon== 9, 1], na.rm = T)
+newdata[(!complete.cases(newdata[, 1]) & newdata$fecha$mon == 10), 1] = mean(newdata[newdata$fecha$mon== 10, 1], na.rm = T)
+y = tapply(newdata$steps, newdata$date, sum, na.rm = T)
+y = as.data.frame(y)
+g = ggplot(y, aes(rownames(y), y))
+a = g + geom_bar(stat = "identity") + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, size = 5)) +
+        labs (x = "Day") + labs (y = "Number of Steps")
+print (a)
+mean = tapply(newdata$steps,newdata$date, mean, na.rm = T)
+median = tapply(newdata$steps,newdata$date, median, na.rm = T)
+```
 
+The mean of data has changed after the replacement.
 
-## Are there differences in activity patterns between weekdays and weekends?
+```{r modified mean}
+print(mean)
+```
+The median does so in days where all values were NA's
+```{r modified median}
+print (median)
+```
+
+The impact of this replacement on daily number of steps is that of rising the value for those days with NA's, particularly those days with no data at all.
+
+Exploring the differences between weekdays and weekends, the following plot:
+
+```{r weekdays and weekends}
+a = c("sábado", "domingo")
+for (i in 1:length(newdata$fecha)){
+        if (weekdays(newdata$fecha[i]) %in% a){
+                newdata$week[i] = "weekend"
+        } else {
+                newdata$week[i] = "weekday"
+        }
+}
+m = aggregate (steps ~ interval + week, FUN = sum, data = newdata)
+g = ggplot(m, aes(interval, steps))
+a = g + geom_line(stat = "identity") + theme(axis.text.x = element_text(angle = 90)) +
+        labs (x = "Interval") + labs (y = "Number of Steps") + scale_x_discrete(breaks = seq(0, 2355, 50)) + facet_grid(week~.)
+print (a)
+```
+
+clearly shows that weekends are "lazier" than weekdays.
